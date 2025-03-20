@@ -1,27 +1,23 @@
-// Library
-
-// UTILS
-
-const response = require('../helpers/apiResponse');
-
 const axios = require('axios');
 
 exports.fetchData = async (req, res) => {
   try {
-    const response = await axios.get('https://bit.ly/48ejMhW'); // Gantilah jika URL berubah
+    const response = await axios.get('https://bit.ly/48ejMhW');
     const { RC, RCM, DATA } = response.data;
+    const { nama, ymd, nim, size, page } = req.query;
+    const limit = size ? parseInt(size) : 10;
+    const currentPage = page ? parseInt(page) : 1;
+    const offset = (currentPage - 1) * limit;
 
     if (RC !== 200) {
       return res.status(400).json({ message: RCM });
     }
 
-    // Pisahkan data berdasarkan baris
     const rows = DATA.split('\n');
     if (rows.length < 2) {
       return res.status(400).json({ message: 'Data format invalid or empty' });
     }
 
-    // Ambil header (baris pertama) dan petakan indeks kolom
     const headers = rows[0].split('|').map((h) => h.trim().toUpperCase());
     const idxYMD = headers.indexOf('YMD');
     const idxNAMA = headers.indexOf('NAMA');
@@ -31,7 +27,6 @@ exports.fetchData = async (req, res) => {
       return res.status(400).json({ message: 'Invalid data format, missing required fields' });
     }
 
-    // Proses data sesuai indeks yang benar
     let result = rows.slice(1).map((row) => {
       const cols = row.split('|');
       return {
@@ -41,10 +36,6 @@ exports.fetchData = async (req, res) => {
       };
     });
 
-    // Ambil query parameter
-    const { nama, ymd, nim } = req.query;
-
-    // Filter berdasarkan parameter yang diberikan
     if (nama) {
       result = result.filter((item) =>
         item.NAMA.toLowerCase().includes(nama.toLowerCase())
@@ -57,7 +48,17 @@ exports.fetchData = async (req, res) => {
       result = result.filter((item) => item.NIM === nim);
     }
 
-    return res.json({ status: 'success', total: result.length, data: result });
+    const paginatedData = result.slice(offset, offset + limit);
+    const totalPages = Math.ceil(result.length / limit);
+
+    return res.json({
+      status: 'success',
+      totalRecords: result.length,
+      data: paginatedData,
+      totalPages,
+      currentPage,
+      pageSize: paginatedData.length,
+    });
   } catch (error) {
     return res.status(500).json({ message: 'Error fetching data', error: error.message });
   }
