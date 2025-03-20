@@ -226,48 +226,56 @@ exports.viewUser = async (req, res) => {
 };
 
 exports.login = async (req, res) => {
-  const { password } = req.body;
-
-  const isMatchPassword = await bcrypt.compare(password, req.user.password);
   try {
-    if (isMatchPassword) {
-      // Update token
-      let refreshToken = req.user.token;
-      console.log(req.user)
-      if (!req.user.token || !jwt.verifyRefreshToken(req.user.token)) {
-        const payloadRefreshToken = {
-          email: req.user.email,
-          id: req.user.id,
-        };
-        refreshToken = jwt.generateRefreshToken(payloadRefreshToken);
-        console.log(refreshToken)
-        await User.update(
-          {
-            token: refreshToken,
-          },
-          {
-            where: { id: req.user.id },
-          },
-        );
-      }
-      const findrole = await Role.findOne({ where: { id: req.user.role_id }, attributes: ['id', 'name'] });
+    const { password } = req.body;
 
-      const findUser = await User.findOne({ where: { id: req.user.id }, attributes: [ 'fullname'] });
+    if (!req.user) {
+      return res.status(400).json({ message: 'User tidak ditemukan' });
+    }
 
-      const data = {
+    const isMatchPassword = await bcrypt.compare(password, req.user.password);
+    if (!isMatchPassword) {
+      return res.status(401).json({ message: 'Password salah' });
+    }
+
+    let refreshToken = req.user.token;
+    if (!req.user.token || !jwt.verifyRefreshToken(req.user.token)) {
+      const payloadRefreshToken = {
         email: req.user.email,
-        user_id: req.user.id,
-        username: req.user.username,
-        fullname: findUser.dataValues.fullname,
-        role_id: findrole.id,
-        role_name: findrole.name,
-        token: refreshToken,
+        id: req.user.id,
       };
 
-      console.log(data);
-      return response.successResponseWithData(res, 'login berhasil', data);
+      refreshToken = jwt.generateRefreshToken(payloadRefreshToken);
+      await User.update({ token: refreshToken }, { where: { id: req.user.id } });
     }
+
+    const findRole = await Role.findOne({
+      where: { id: req.user.role_id },
+      attributes: ['id', 'name'],
+    });
+
+    const findUser = await User.findOne({
+      where: { id: req.user.id },
+      attributes: ['fullname'],
+    });
+
+    if (!findRole || !findUser) {
+      return res.status(400).json({ message: 'Data user tidak lengkap' });
+    }
+
+    const data = {
+      email: req.user.email,
+      user_id: req.user.id,
+      username: req.user.username,
+      fullname: findUser.fullname,
+      role_id: findRole.id,
+      role_name: findRole.name,
+      token: refreshToken,
+    };
+
+    return response.successResponseWithData(res, 'Login berhasil', data);
   } catch (err) {
-    res.status(500).send({ message: err });
+    console.error('Login Error:', err);
+    return res.status(500).json({ message: 'Terjadi kesalahan pada server' });
   }
 };
