@@ -6,6 +6,7 @@ const helmet = require('helmet');
 
 const mstroleRoute = require('../routes/mst_role_route');
 const userRoute = require('../routes/user_route');
+const employeeRoute = require('../routes/employee_route');
 
 exports.start = (config) => {
   const app = express();
@@ -34,6 +35,7 @@ exports.start = (config) => {
 
   app.use('/mst-roles', mstroleRoute)
   app.use('/users', userRoute);
+  app.use('/employee', employeeRoute);
 
   try {
     app.listen(config.port, () => {
